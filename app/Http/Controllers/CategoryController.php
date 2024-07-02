@@ -47,7 +47,7 @@ class CategoryController extends Controller
         $item = Category::find($id);
         if($request->input("name")!="") {
             if($request->hasFile('image')) {
-                $this->destroy($id);
+                $this->deleteImage($id);
                 $file = $request->file("image");
                 $item->image = $this->saveImage($file);
             }
@@ -58,6 +58,15 @@ class CategoryController extends Controller
         return response()->json("Bad request", 400);
     }
 
+
+    protected function deleteImage(int $id) {
+        $item = Category::find($id);
+        foreach ($this->sizes as $size) {
+            $path = public_path($this->upload.$size."_".$item->image);
+            if(file_exists($path))
+                unlink($path);
+        }
+    }
 
     protected function saveImage(UploadedFile $file) {
         $fileName = uniqid(). ".webp";
@@ -71,122 +80,25 @@ class CategoryController extends Controller
         return $fileName;
     }
 
-//    public function update(Request $request, $id)
-//    {
-//        $request->validate([
-//            'name' => 'required|max:255',
-//            'image' => 'mimes:jpeg,jpg,png|max:2048'
-//        ]);
-//
-//        $category = Category::findOrFail($id);
-//
-//        // Update the name if provided
-//        if ($request->has('name')) {
-//            $category->name = $request->input('name');
-//        }
-//
-//        // Directory where images are stored
-//        $dir = public_path($this->upload);
-//
-//        // Check if a new image file is provided
-//        if ($request->hasFile('image')) {
-//            // Delete old image files
-//            foreach ($this->sizes as $size) {
-//                $path = public_path($this->upload . $size . '_' . $category->image);
-//                if (file_exists($path)) {
-//                    unlink($path);
-//                }
-//            }
-//
-//            // Save new image files
-//            $file = $request->file("image");
-//            $fileName = uniqid() . ".webp";
-//            $manager = new ImageManager(new Driver());
-//
-//            foreach ($this->sizes as $size) {
-//                $imageSave = $manager->read($file);
-//                $imageSave->scale(width: $size);
-//                $path = public_path($this->upload . $size . "_" . $fileName);
-//                $imageSave->toWebp()->save($path);
-//            }
-//
-//            // Update the image filename in the database
-//            $category->image = $fileName;
-//        }
-//
-//        // Save the changes to the database
-//        $category->save();
-//
-//        // Return the updated category as a JSON response
-//        return response()->json($category);
-//    }
-
-
-
-//    public function update(Request $request, $id)
-//    {
-//        $category = Category::findOrFail($id);
-//
-//        // Update the name if provided
-//        if ($request->has('name')) {
-//            $category->name = $request->input('name');
-//        }
-//
-//        // Directory where images are stored
-//        $dir = public_path($this->upload);
-//
-//        // Check if a new image file is provided
-//        if ($request->hasFile('image')) {
-//            // Delete old image files
-//            foreach ($this->sizes as $size) {
-//                $path = public_path($this->upload . $size . '_' . $category->image);
-//                if (file_exists($path)) {
-//                    unlink($path);
-//                }
-//            }
-//
-//            // Save new image files
-//            $file = $request->file("image");
-//            $fileName = uniqid() . ".webp";
-//            $manager = new ImageManager(new Driver());
-//
-//            foreach ($this->sizes as $size) {
-//                $imageSave = $manager->read($file);
-//                $imageSave->scale(width: $size);
-//                $path = public_path($this->upload . $size . "_" . $fileName);
-//                $imageSave->toWebp()->save($path);
-//            }
-//
-//            // Update the image filename in the database
-//            $category->image = $fileName;
-//        }
-//
-//        // Save the changes to the database
-//        $category->save();
-//
-//        // Return the updated category as a JSON response
-//        return response()->json($category);
-//    }
-
-
-
-
-
 
     public function destroy(int $id)
     {
-        $category = Category::findOrFail($id);
+        $category = Category::with('products')->findOrFail($id);
 
-        // Delete associated image files
-        foreach ($this->sizes as $size) {
-            $path = public_path($this->upload . $size . '_' . $category->image);
-            if (file_exists($path)) {
-                unlink($path);
+        // Delete associated product images
+        foreach ($category->products as $product) {
+            foreach ($this->sizes as $size) {
+                $productImagePath = public_path($this->upload . $size . "_" . $product->image);
+                if (file_exists($productImagePath)) {
+                    unlink($productImagePath);
+                }
             }
+            $product->delete();
         }
+
+        $this->deleteImage($id);
 
         $category->delete();
 
-        return response()->json(['message' => 'Category and associated images deleted successfully']);
     }
 }
